@@ -20,7 +20,7 @@ ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
 
 APP_VERSION = "0.0.1"
-GITHUB_REPO = "your_username/your_repo" # TODO: Update this
+GITHUB_REPO = "https://github.com/VannsanNin/angkorFolderIcon.git" # TODO: Update this
 
 class UpdateChecker:
     @staticmethod

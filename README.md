@@ -1,6 +1,6 @@
 # Icon Changer (VSCode Material Icons)
 
-A modern, dark-themed GUI application to easily change folder and file icons on Linux (and Windows), utilizing the beautiful [VSCode Material Icon Theme](https://github.com/PKief/vscode-material-icon-theme) collection.
+A modern, dark-themed GUI application to easily change folder and file icons on Linux (and Windows), utilizing the beautiful [ankor folder icon](https://github.com/VannsanNin/angkorFolderIcon.git) collection.
 
 ## ✨ Features
 
@@ -17,8 +17,8 @@ A modern, dark-themed GUI application to easily change folder and file icons on 
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/your-username/icon-changer.git
-    cd icon-changer
+    git clone https://github.com/VannsanNin/angkorFolderIcon.git
+    cd  angkorFolderIcon
     ```
 
 2.  **Install dependencies**:
@@ -53,7 +53,7 @@ To enable Auto-Updates, update the repository configuration in `folder_icon_chan
 
 ```python
 APP_VERSION = "0.0.1"
-GITHUB_REPO = "your_username/your_repo"
+GITHUB_REPO = "https://github.com/VannsanNin/angkorFolderIcon.git"
 ```
 
 ## 📝 License
