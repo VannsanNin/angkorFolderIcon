@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# IDEs
+.idea/
+.vscode/
+
+# PyInstaller (Build Artifacts)
+build/
+dist/
+*.spec
+
+# OS Generated
+.DS_Store
+Thumbs.db
+
+# App Specific (if any local cache/logs are created in the folder)
+# (Your app currently uses home/.cache so no need to ignore local cache folders unless you change it)

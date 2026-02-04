@@ -1,0 +1,6 @@
+customtkinter
+Pillow
+cairosvg
+packaging
+pyinstaller
+requests
