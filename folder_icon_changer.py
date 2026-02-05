@@ -66,6 +66,13 @@ class IconChangerApp(ctk.CTk):
         self.folder_icons_all = []
         self.file_icons_all = []
 
+        # Lazy Loading State
+        self.batch_size = 20
+        self.current_display_list = []
+        self.loaded_count = 0
+        self.is_loading = False
+        self.load_id = 0
+
         # Ensure cache directories exist
         PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
         CONVERTED_DIR.mkdir(parents=True, exist_ok=True)
@@ -158,6 +165,28 @@ class IconChangerApp(ctk.CTk):
         self.scroll_files.pack(fill="both", expand=True)
         self.scroll_files.grid_columnconfigure((0,1,2,3,4), weight=1)
 
+        # Start scroll check loop
+        self.check_scroll_loop()
+
+    def check_scroll_loop(self):
+        try:
+            current_tab = self.tabview.get()
+            if current_tab == "Folders":
+                scroll_frame = self.scroll_folders
+            else:
+                scroll_frame = self.scroll_files
+            
+            # yview returns (top_fraction, bottom_fraction)
+            # If bottom_fraction is near 1.0, we are at the bottom
+            _, bottom = scroll_frame._parent_canvas.yview()
+            if bottom > 0.90: # Trigger a bit earlier
+                self.load_more_icons()
+        except Exception:
+            pass
+        finally:
+            # Check every 300ms
+            self.after(300, self.check_scroll_loop)
+
     def start_loading_icons(self):
         self.status_label.configure(text="Loading icons...")
         threading.Thread(target=self.load_icons_thread, daemon=True).start()
@@ -205,11 +234,9 @@ class IconChangerApp(ctk.CTk):
 
         if current_tab == "Folders":
             source_list = self.folder_icons_all
-            parent_frame = self.scroll_folders
             btn_list = self.folder_buttons
         else:
             source_list = self.file_icons_all
-            parent_frame = self.scroll_files
             btn_list = self.file_buttons
 
         # Clear existing buttons
@@ -217,23 +244,60 @@ class IconChangerApp(ctk.CTk):
             btn.destroy()
         btn_list.clear()
 
+        # Update ID to invalidate old threads
+        self.load_id += 1
+
         # Filter
-        filtered = [p for p in source_list if query in p.stem.lower()]
+        self.current_display_list = [p for p in source_list if query in p.stem.lower()]
+        self.loaded_count = 0
         
-        # Limit to first 100 to avoid freezing if query is empty? 
-        # 1000 icons is a lot for tkinter grid info.
-        # Let's cap at 50 if query is empty, or 100 if searching.
-        limit = 200
-        display_list = filtered[:limit]
+        # Trigger initial load
+        self.load_more_icons()
 
-        # Populate
-        threading.Thread(target=self.populate_icons_thread, args=(display_list, parent_frame, btn_list), daemon=True).start()
+    def load_more_icons(self):
+        if self.is_loading:
+            return
+        
+        if self.loaded_count >= len(self.current_display_list):
+            return
 
-    def populate_icons_thread(self, display_list, parent_frame, btn_list):
-        row, col = 0, 0
+        self.is_loading = True
+        
+        current_tab = self.tabview.get()
+        if current_tab == "Folders":
+            parent_frame = self.scroll_folders
+            btn_list = self.folder_buttons
+        else:
+            parent_frame = self.scroll_files
+            btn_list = self.file_buttons
+
+        # Determine batch
+        start_index = self.loaded_count
+        end_index = min(self.loaded_count + self.batch_size, len(self.current_display_list))
+        batch = self.current_display_list[start_index:end_index]
+        
+        # Capture current load_id
+        current_load_id = self.load_id
+
+        # Start thread
+        threading.Thread(target=self.populate_icons_thread, args=(batch, start_index, current_load_id, parent_frame, btn_list), daemon=True).start()
+        
+        self.loaded_count = end_index
+
+    def populate_icons_thread(self, display_list, start_index, load_id, parent_frame, btn_list):
         max_cols = 5
-        
+        current_idx = start_index
+
         for svg_path in display_list:
+            # Check if obsolete
+            if load_id != self.load_id:
+                self.is_loading = False
+                return
+
+            # Calc row/col based on absolute index
+            row = current_idx // max_cols
+            col = current_idx % max_cols
+
             # Prepare image
             preview_path = PREVIEW_DIR / f"{svg_path.stem}.png"
             if not preview_path.exists():
@@ -243,17 +307,18 @@ class IconChangerApp(ctk.CTk):
                     continue
             
             # Add to UI main thread
-            self.after(0, lambda p=preview_path, s=svg_path, r=row, c=col, pf=parent_frame, bl=btn_list: self.add_button(p, s, r, c, pf, bl))
+            self.after(0, lambda p=preview_path, s=svg_path, r=row, c=col, lid=load_id, pf=parent_frame, bl=btn_list: self.add_button(p, s, r, c, lid, pf, bl))
             
-            col += 1
-            if col >= max_cols:
-                col = 0
-                row += 1
+            current_idx += 1
+        
+        self.is_loading = False
 
-    def add_button(self, preview_path, svg_path, row, col, parent_frame, btn_list):
+    def add_button(self, preview_path, svg_path, row, col, load_id, parent_frame, btn_list):
+        if load_id != self.load_id:
+            return
+
         try:
             name = svg_path.stem.replace("folder-", "")
-            # Shorten name if too long
             if len(name) > 15:
                 name = name[:12] + "..."
 
@@ -271,8 +336,39 @@ class IconChangerApp(ctk.CTk):
             )
             btn.grid(row=row, column=col, padx=5, pady=5)
             btn_list.append(btn)
+            
+            # Bind scroll events to the button to ensure scrolling works when hovering
+            # Linux
+            btn.bind("<Button-4>", lambda e: self._on_mouse_scroll(e, parent_frame, -1))
+            btn.bind("<Button-5>", lambda e: self._on_mouse_scroll(e, parent_frame, 1))
+            # Windows/MacOS
+            btn.bind("<MouseWheel>", lambda e: self._on_mouse_scroll(e, parent_frame, 0))
+            
         except Exception:
             pass
+
+    def _on_mouse_scroll(self, event, scroll_frame, direction):
+        # direction: -1 (up), 1 (down), 0 (mousewheel delta)
+        try:
+            if direction == 0:
+                # Windows/MacOS
+                scroll_frame._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+            else:
+                # Linux
+                scroll_frame._parent_canvas.yview_scroll(direction, "units")
+            
+            # Optional: Check load trigger immediately for responsiveness
+            self.check_scroll_position_manual(scroll_frame)
+        except:
+            pass
+            
+    def check_scroll_position_manual(self, scroll_frame):
+         try:
+            _, bottom = scroll_frame._parent_canvas.yview()
+            if bottom > 0.90:
+                self.load_more_icons()  
+         except:
+             pass
 
     def select_target(self):
         tab = self.tabview.get()
