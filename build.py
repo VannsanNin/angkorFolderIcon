@@ -17,6 +17,7 @@ PyInstaller.__main__.run([
     '--onefile',
     '--windowed',  # No console window
     f'--add-data={ctk_path}{sep}customtkinter', # Add ctk themes
+    f'--add-data=icons{sep}icons', # Add icons folder
     '--hidden-import=PIL._tkinter_finder', # Sometimes needed
     '--hidden-import=cairosvg',
     '--hidden-import=packaging',

@@ -10,8 +10,20 @@ import urllib.request
 import webbrowser
 from packaging import version
 
+import sys
+
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return Path(os.path.join(base_path, relative_path))
+
 # Configuration
-ICON_DIR = Path("icons")
+ICON_DIR = resource_path("icons")
 CACHE_DIR = Path.home() / ".cache" / "folder-icon-changer"
 PREVIEW_DIR = CACHE_DIR / "previews"
 CONVERTED_DIR = CACHE_DIR / "converted"
